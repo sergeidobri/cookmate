@@ -1,22 +1,47 @@
-import { ingredientsApi } from "@/api/ingredients/api";
+import { recipesApi } from "@/api/recipes/api";
 import Hint from "@/components/ui/Hint";
 import Ingredient from "@/components/ui/Ingredient";
+import { useIngredientsStore } from "@/store/ingredients";
 import cn from "@/utils/classname-func";
-import { useQuery } from "@tanstack/react-query";
-import { Camera, Upload, ChefHatIcon, CircleX } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { Camera, Upload, ChefHatIcon, CircleX, Loader2 } from "lucide-react";
+import { useRef } from "react";
+import { Route as recipesListRoute } from "@/routes/recipes/index";
+import { Link } from "@tanstack/react-router";
 
 export function ScanPage() {
-  const {
-    data: lastIngredients,
-    isError,
-    isPending,
-  } = useQuery({
-    queryKey: ["ingredients", "last"],
-    queryFn: ingredientsApi.getLast,
+  const navigate = useNavigate();
+  const setCurrentIngredients = useIngredientsStore(
+    (state) => state.setCurrentIngredients,
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastIngredients = useIngredientsStore(
+    (state) => state.currentIngredients,
+  );
+
+  const recognizeMutation = useMutation({
+    mutationFn: recipesApi.recognize,
+    onSuccess: (data) => {
+      setCurrentIngredients(data.recognizedIngredients);
+
+      navigate({ to: recipesListRoute.to });
+    },
+    onError: (error) => {
+      console.error("Ошибка загрузки:", error);
+    },
   });
 
-  const lastIngredientsNotFound =
-    isError || isPending || lastIngredients.ingredientsNumber == 0;
+  const lastIngredientsNotFound = lastIngredients.length == 0;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    recognizeMutation.mutate(file);
+
+    e.target.value = "";
+  };
 
   return (
     <div className="min-h-screen">
@@ -32,6 +57,14 @@ export function ScanPage() {
             сейчас
           </p>
         </div>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
 
         <div className="grid grid-cols-2 gap-8 items-start">
           <div className="flex flex-col gap-4">
@@ -54,9 +87,32 @@ export function ScanPage() {
               <div className="flex-1 h-px bg-border" />
             </div>
 
-            <button className="bg-secondary text-foreground w-full py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 active:scale-[0.99]">
+            {/* <button className="bg-secondary text-foreground w-full py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 active:scale-[0.99]">
               <Upload size={18} />
               <span>Загрузите изображение</span>
+            </button> */}
+            <button
+              type="button"
+              disabled={recognizeMutation.isPending}
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "bg-secondary text-foreground w-full py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all",
+                recognizeMutation.isPending
+                  ? "opacity-60 cursor-not-allowed"
+                  : "hover:opacity-90 active:scale-[0.99]",
+              )}
+            >
+              {recognizeMutation.isPending ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Загрузка...</span>
+                </>
+              ) : (
+                <>
+                  <Upload size={18} />
+                  <span>Загрузите изображение</span>
+                </>
+              )}
             </button>
 
             <Hint
@@ -78,41 +134,35 @@ export function ScanPage() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-6">
-              {!isError &&
-                !isPending &&
-                lastIngredients.ingredients.map((ing) => (
-                  <Ingredient title={ing} key={ing} />
-                ))}
-              {isError ||
-                isPending ||
-                (lastIngredients.ingredientsNumber == 0 && (
-                  <div className="flex justify-center items-center flex-col gap-4">
-                    <div className="w-20 h-20 rounded-full flex items-center justify-center bg-secondary">
-                      <CircleX size={34} className="text-primary" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-foreground font-semibold">
-                        Ингредиенты не найдены
-                      </p>
-                      <Hint
-                        text="Мы не смогли распознать продукты на фото. Попробуйте сделать снимок при лучшем освещении."
-                        className="text-sm! mt-2"
-                      />
-                    </div>
+              {lastIngredients.map((ing) => (
+                <Ingredient title={ing} key={ing} />
+              ))}
+              {lastIngredients.length == 0 && (
+                <div className="flex justify-center items-center flex-col gap-4">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center bg-secondary">
+                    <CircleX size={34} className="text-primary" />
                   </div>
-                ))}
+                  <div className="text-center">
+                    <p className="text-foreground font-semibold">
+                      Ингредиенты не найдены
+                    </p>
+                    <Hint
+                      text="Мы не смогли распознать продукты на фото. Попробуйте сделать снимок при лучшем освещении."
+                      className="text-sm! mt-2"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl p-4 mb-5 bg-secondary">
               <div className="flex items-center justify-between">
-                {!isError && !isPending && (
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {lastIngredients.ingredientsNumber} ингредиентов найдено
-                    </p>
-                    <Hint text="Готовы для поиска рецептов" />
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {lastIngredients.length} ингредиентов найдено
+                  </p>
+                  <Hint text="Готовы для поиска рецептов" />
+                </div>
                 <div
                   className={cn(
                     "w-10 h-10 rounded-full flex items-center justify-center",
@@ -122,13 +172,14 @@ export function ScanPage() {
                   )}
                 >
                   <span className="text-white font-bold text-sm">
-                    {lastIngredients?.ingredientsNumber}
+                    {lastIngredients.length}
                   </span>
                 </div>
               </div>
             </div>
 
-            <button
+            <Link
+              to={lastIngredients.length > 0 ? recipesListRoute.to : "."}
               className={cn(
                 "text-primary-foreground w-full py-3.5 rounded-xl flex items-center justify-center gap-2.5",
                 lastIngredientsNotFound
@@ -138,10 +189,8 @@ export function ScanPage() {
               disabled={lastIngredientsNotFound}
             >
               <ChefHatIcon size={18} />
-              <span style={{ fontWeight: 600 }}>
-                Найти рецепты с этими ингредиентами
-              </span>
-            </button>
+              Найти рецепты с этими ингредиентами
+            </Link>
           </div>
         </div>
       </div>

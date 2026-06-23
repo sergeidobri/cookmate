@@ -13,6 +13,8 @@ import Button from "@/components/ui/Button";
 import { useAuthStore } from "@/store/auth";
 import { Route as loginRoute } from "@/routes/auth/login";
 import { Route as registerRoute } from "@/routes/auth/register";
+import { useIngredientsStore } from "@/store/ingredients";
+import { useEffect } from "react";
 
 const RootLayout = () => {
   const { pathname } = useLocation();
@@ -23,6 +25,13 @@ const RootLayout = () => {
     useAuthStore.getState().clearAuth();
     navigate({ to: loginRoute.to });
   };
+
+  const initIngredients = useIngredientsStore((s) => s.initIngredients);
+
+  useEffect(() => {
+    initIngredients();
+  }, []);
+
   return (
     <div className="flex min-h-screen">
       <aside

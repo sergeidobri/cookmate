@@ -6,9 +6,13 @@ import Ingredient from "../ui/Ingredient";
 import Hint from "../ui/Hint";
 import cn from "@/utils/classname-func";
 import Button from "../ui/Button";
-import { Link } from "@tanstack/react-router";
 
-const RecipeAccordionItem = ({ recipe }: { recipe: Recipe }) => {
+interface Props {
+  recipe: Recipe;
+  currentIngredients: string[];
+}
+
+const RecipeAccordionItem = ({ recipe, currentIngredients }: Props) => {
   const [open, setOpen] = useState(false);
   const [fav, setFav] = useState(false);
 
@@ -16,6 +20,15 @@ const RecipeAccordionItem = ({ recipe }: { recipe: Recipe }) => {
     e.stopPropagation();
     setFav((val) => !val);
   };
+
+  const availableIngredients = recipe.components.filter((ing) =>
+    currentIngredients.includes(ing.toLowerCase()),
+  );
+
+  console.log(availableIngredients, recipe.components);
+  const matchScore = Math.round(
+    (availableIngredients.length / recipe.components.length) * 100,
+  );
 
   return (
     <div className="rounded-2xl overflow-hidden transition-all bg-card mb-3 border border-custom">
@@ -29,7 +42,7 @@ const RecipeAccordionItem = ({ recipe }: { recipe: Recipe }) => {
             />
             <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center bg-primary border border-card border-[2px]">
               <span className="text-white text-xs font-bold">
-                {recipe.matchScore}%
+                {matchScore}%
               </span>
             </div>
           </div>
@@ -88,14 +101,14 @@ const RecipeAccordionItem = ({ recipe }: { recipe: Recipe }) => {
                 {recipe.components.map((ing) => (
                   <Ingredient
                     className="text-xs"
-                    available={ing.available}
-                    title={`${ing.available ? "✓ " : ""}${ing.title}`}
+                    available={currentIngredients.includes(ing)}
+                    title={`${currentIngredients.includes(ing) ? "✓ " : ""}${ing}`}
                   />
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-3">
                 <span className="text-primary font-semibold">
-                  {recipe.components.filter((i) => i.available).length}
+                  {availableIngredients.length}
                 </span>
                 /{recipe.components.length} ингредиентов в наличии
               </p>

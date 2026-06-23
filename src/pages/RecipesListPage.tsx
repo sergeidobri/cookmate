@@ -1,43 +1,41 @@
-import { ingredientsApi } from "@/api/ingredients/api";
 import { recipesApi } from "@/api/recipes/api";
 import RecipeAccordionItem from "@/components/recipes/RecipeAccordionItem";
 import Hint from "@/components/ui/Hint";
 import Ingredient from "@/components/ui/Ingredient";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CircleX, ScanLine, Sparkles } from "lucide-react";
 import { Route as ScanRoute } from "@/routes/index";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
+import { useIngredientsStore } from "@/store/ingredients";
 
 export function RecipesListPage() {
-  const {
-    data: lastIngredients,
-    isError: isIngredientsError,
-    isPending: isIngredientsPending,
-  } = useQuery({
-    queryKey: ["ingredients", "last"],
-    queryFn: ingredientsApi.getLast,
-  });
+  const currentIngredients = useIngredientsStore(
+    (state) => state.currentIngredients,
+  );
+  const setCurrentIngredients = useIngredientsStore(
+    (state) => state.setCurrentIngredients,
+  );
+
+  const queryKey = useMemo(
+    () => ["recipes", [...currentIngredients].sort().join(",")],
+    [currentIngredients],
+  );
+
+  const handleIngredientChange = (newIngredients: string[]) => {
+    setCurrentIngredients(newIngredients);
+  };
 
   const {
     data: recipes,
     isError: isRecipesError,
     isPending: isRecipesPending,
   } = useQuery({
-    queryKey: ["recipes"],
-    queryFn: recipesApi.getList,
-  });
-
-  const queryClient = useQueryClient();
-
-  const ingredientsMutation = useMutation({
-    mutationFn: (newIng: string) => {
-      return ingredientsApi.addIngredient(newIng);
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(["ingredients", "last"], data);
-    },
+    queryKey,
+    queryFn: () => recipesApi.findByIngredients(currentIngredients),
+    enabled: currentIngredients.length > 0,
+    staleTime: 2 * 60 * 60 * 1000,
   });
 
   const [ingToAdd, setIngToAdd] = useState("");
@@ -45,7 +43,7 @@ export function RecipesListPage() {
 
   const handleAddIngredient = () => {
     if (ingToAdd.length == 0) return;
-    ingredientsMutation.mutate(ingToAdd);
+    handleIngredientChange([...currentIngredients, ingToAdd]);
     setShowIngForm(false);
     setIngToAdd("");
   };
@@ -56,14 +54,8 @@ export function RecipesListPage() {
   };
 
   const handleDeleteIngredient = (ing: string) => {
-    if (lastIngredients?.ingredients == undefined) return;
-    const newIngredientsList = lastIngredients.ingredients.filter(
-      (item) => item != ing,
-    );
-    queryClient.setQueryData(["ingredients", "last"], {
-      ingredients: newIngredientsList,
-      ingredientsNumber: newIngredientsList.length,
-    });
+    if (currentIngredients == undefined) return;
+    handleIngredientChange(currentIngredients.filter((item) => item != ing));
   };
 
   return (
@@ -83,10 +75,11 @@ export function RecipesListPage() {
               </span>
             </div>
             <p className="text-sm font-semibold text-foreground">
-              {lastIngredients?.ingredientsNumber} ингредиентов обнаружено
+              {currentIngredients.length} ингредиентов обнаружено
             </p>
+
             <Hint
-              text={`${recipes?.recipesNumber} подходящих рецептов найдено`}
+              text={`${recipes && recipes.recipeCount ? recipes.recipeCount : 0} подходящих рецептов найдено`}
               className="mt-1"
             />
           </div>
@@ -97,17 +90,15 @@ export function RecipesListPage() {
               className="text-xs!"
               onClick={() => setShowIngForm(true)}
             />
-            {!isIngredientsError &&
-              !isIngredientsPending &&
-              lastIngredients.ingredients.map((ing) => (
-                <Ingredient
-                  key={ing}
-                  title={ing}
-                  className="text-xs"
-                  onClick={() => handleDeleteIngredient(ing)}
-                  deletable
-                />
-              ))}
+            {currentIngredients.map((ing) => (
+              <Ingredient
+                key={ing}
+                title={ing}
+                className="text-xs"
+                onClick={() => handleDeleteIngredient(ing)}
+                deletable
+              />
+            ))}
           </div>
           {showIngForm && (
             <div className="flex flex-col gap-4">
@@ -152,14 +143,16 @@ export function RecipesListPage() {
             text="Отсортированные по оценке совпадения ингредиентов - нажмите на рецепт для получения подробной информации"
             className="text-sm! mb-6"
           />
-          {recipes?.recipes
-            .sort((recA, recB) => recB.matchScore - recA.matchScore)
-            .map((recipe) => (
-              <RecipeAccordionItem key={recipe.id} recipe={recipe} />
-            ))}
+          {recipes?.recipes.map((recipe) => (
+            <RecipeAccordionItem
+              key={recipe.id}
+              recipe={recipe}
+              currentIngredients={currentIngredients}
+            />
+          ))}
           {isRecipesError ||
             isRecipesPending ||
-            (recipes.recipesNumber == 0 && (
+            (recipes.recipeCount == 0 && (
               <div className="flex justify-center items-center">
                 <div className="w-fit bg-card p-8 rounded-2xl border border-custom flex justify-center items-center gap-4 flex-col">
                   <div className="w-20 h-20 rounded-full flex items-center justify-center bg-secondary">
@@ -171,7 +164,7 @@ export function RecipesListPage() {
                     </p>
                     <Hint
                       text={
-                        lastIngredients?.ingredientsNumber == 0
+                        currentIngredients.length == 0
                           ? "Не удалось распознать продукты на фотографии. Добавьте их вручную либо сфотографируйте их заново"
                           : "Для данных продуктов не получилось найти подходящие рецепты"
                       }

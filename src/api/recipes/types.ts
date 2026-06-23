@@ -8,3 +8,15 @@ export interface GetRecipesListResponse {
 export interface GetRecipeDetailResponse {
   recipe: RecipeDetail;
 }
+
+export interface RecognizeResponse {
+  recognizedIngredients: string[];
+  recipeCount: number;
+  recipes: Recipe[];
+}
+
+export type SearchHistoryResponse = {
+  id: number;
+  ingredients: string[];
+  createdAt: string;
+}[];

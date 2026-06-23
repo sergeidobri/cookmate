@@ -1,12 +1,12 @@
 export interface Recipe {
-  id: string;
+  id: number;
   title: string;
+  slug: string;
   description: string;
   image?: string;
   calories?: number;
   approximateTime: string;
-  components: RecipeComponent[];
-  matchScore: number;
+  components: string[];
 }
 
 export interface RecipeDetail {
