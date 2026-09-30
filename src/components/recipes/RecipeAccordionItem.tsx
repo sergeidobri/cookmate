@@ -25,7 +25,6 @@ const RecipeAccordionItem = ({ recipe, currentIngredients }: Props) => {
     currentIngredients.includes(ing.toLowerCase()),
   );
 
-  console.log(availableIngredients, recipe.components);
   const matchScore = Math.round(
     (availableIngredients.length / recipe.components.length) * 100,
   );
